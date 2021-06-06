@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
 import pyrealsense2 as rs
 import numpy as np
-import pyrealsense2
 import cv2
 
 WIDTH = 640
 HEIGHT = 480
 
 # color format
+# データ形式の話
 color_stream, color_format = rs.stream.color, rs.format.bgr8
 depth_stream, depth_format = rs.stream.depth, rs.format.z16
 
 # ストリーミング初期化
+# RealSenseからデータを受信するための準備
+# config.enable_streamでRGB，Dの解像度とデータ形式，フレームレートを指定している
 config = rs.config()
 config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
 config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
@@ -24,9 +26,11 @@ profile = pipeline.start(config)
 depth_sensor = profile.get_device().first_depth_sensor()
 depth_scale = depth_sensor.get_depth_scale()
 clipping_distance_in_meters = 0.4 # 40cm以内を検出
+# depth値にする
 clipping_distance = clipping_distance_in_meters / depth_scale
 
 # Alignオブジェクト生成
+# RGBとDの画角の違いによるズレを修正している
 align_to = rs.stream.color
 align = rs.align(align_to)
 # 検出とプリントするための閾値
@@ -35,14 +39,19 @@ threshold = (WIDTH * HEIGHT * 3) * 0.95
 try:
     while True:
         # フレーム待ち（color&depth）
+        # フレーム取得
         frames = pipeline.wait_for_frames()
+        # フレームの画角差を修正
         aligned_frames = align.process(frames)
+        # フレームの切り分け
         color_frame = aligned_frames.get_color_frame()
         depth_frame = aligned_frames.get_depth_frame()
         if not depth_frame or not color_frame:
             continue
 
+        # RGB画像のフレームから画素値をnumpy配列に変換
         color_image = np.asanyarray(color_frame.get_data())
+        # D画像のフレームから画素値をnumpy配列に変換
         depth_image = np.asanyarray(depth_frame.get_data())
 
         # clipping_distance_in_metersm以内を画像化
