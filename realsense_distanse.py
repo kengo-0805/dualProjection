@@ -5,6 +5,7 @@ import cv2
 
 WIDTH = 640
 HEIGHT = 480
+THRESHOLD = 1.5 # これより近い距離の画素を無視する
 
 # color format
 # データ形式の話
@@ -34,7 +35,8 @@ clipping_distance = clipping_distance_in_meters / depth_scale
 align_to = rs.stream.color
 align = rs.align(align_to)
 # 検出とプリントするための閾値
-threshold = (WIDTH * HEIGHT * 3) * 0.95
+threshold = (WIDTH * HEIGHT * 3) * 0.9
+max_dist = THRESHOLD / depth_scale
 
 try:
     while True:
@@ -44,27 +46,37 @@ try:
         # フレームの画角差を修正
         aligned_frames = align.process(frames)
         # フレームの切り分け
+        # 多分これに射影変換行列をかけたら視点の変更ができる
         color_frame = aligned_frames.get_color_frame()
         depth_frame = aligned_frames.get_depth_frame()
         if not depth_frame or not color_frame:
             continue
 
         # RGB画像のフレームから画素値をnumpy配列に変換
+        # これで普通のRGB画像になる
         color_image = np.asanyarray(color_frame.get_data())
         # D画像のフレームから画素値をnumpy配列に変換
         depth_image = np.asanyarray(depth_frame.get_data())
 
-        # clipping_distance_in_metersm以内を画像化
-        white_color = 255 # 背景色
-        depth_image_3d = np.dstack((depth_image, depth_image, depth_image))
-        bg_removed = np.where((depth_image_3d < clipping_distance) | (depth_image_3d <= 0), white_color, color_image)
-        # 背景色となっているピクセル数をカウント
-        white_pic = np.sum(bg_removed == 255)
-        # 背景色が一定値以下になった時に、「検出」を表示する
-        if(threshold > white_pic):
-            print("検出 {}".format(white_pic))
-        else:
-            print("{}".format(white_pic))
+
+        # 指定距離以下を無視した深度画像の生成
+        depth_filterd_image = (depth_image > max_dist) * depth_image
+        depth_gray_filterd_image = (depth_filterd_image * 255. /max_dist).reshape((HEIGHT, WIDTH)).astype(np.uint8)
+
+        # 指定距離以下を無視したRGB画像の
+
+
+        # # clipping_distance_in_metersm以内を画像化
+        # white_color = 255 # 背景色
+        # depth_image_3d = np.dstack((depth_image, depth_image, depth_image))
+        # bg_removed = np.where((depth_image_3d < clipping_distance) | (depth_image_3d <= 0), white_color, color_image)
+        # # 背景色となっているピクセル数をカウント
+        # white_pic = np.sum(bg_removed == 255)
+        # # 背景色が一定値以下になった時に、「検出」を表示する
+        # if(threshold > white_pic):
+        #     print("検出 {}".format(white_pic))
+        # else:
+        #     print("{}".format(white_pic))
 
         # 表示
         images = np.hstack((bg_removed, color_image))
