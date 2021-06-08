@@ -26,16 +26,16 @@ profile = pipeline.start(config)
 # 距離[m] = depth * depth_scale
 depth_sensor = profile.get_device().first_depth_sensor()
 depth_scale = depth_sensor.get_depth_scale()
-clipping_distance_in_meters = 0.4 # 40cm以内を検出
+# clipping_distance_in_meters = 0.4 # 40cm以内を検出
 # depth値にする
-clipping_distance = clipping_distance_in_meters / depth_scale
+# clipping_distance = clipping_distance_in_meters / depth_scale
 
 # Alignオブジェクト生成
 # RGBとDの画角の違いによるズレを修正している
 align_to = rs.stream.color
 align = rs.align(align_to)
 # 検出とプリントするための閾値
-threshold = (WIDTH * HEIGHT * 3) * 0.9
+# threshold = (WIDTH * HEIGHT * 3) * 0.9
 max_dist = THRESHOLD / depth_scale
 
 try:
@@ -63,7 +63,8 @@ try:
         depth_filterd_image = (depth_image > max_dist) * depth_image
         depth_gray_filterd_image = (depth_filterd_image * 255. /max_dist).reshape((HEIGHT, WIDTH)).astype(np.uint8)
 
-        # 指定距離以下を無視したRGB画像の
+        # 指定距離以下を無視したRGB画像の生成
+        color_filterd_image = (depth_filterd_image.reshape((HEIGHT, WIDTH, 1)) > 0) * color_image
 
 
         # # clipping_distance_in_metersm以内を画像化
@@ -79,7 +80,7 @@ try:
         #     print("{}".format(white_pic))
 
         # 表示
-        images = np.hstack((bg_removed, color_image))
+        images = np.hstack((color_filterd_image, color_image))
         cv2.imshow('Frames', images)
         if cv2.waitKey(1) & 0xff == 27:
             break
