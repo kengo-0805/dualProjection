@@ -56,10 +56,11 @@ try:
         # これで普通のRGB画像になる
         color_image = np.asanyarray(color_frame.get_data())
         # D画像のフレームから画素値をnumpy配列に変換
-        depth_image = np.asanyarray(depth_frame.get_data())
+        depth_image = np.asanyarray(depth_frame.get_data()) # 深度の画素値が入っている
 
 
         # 指定距離以下を無視した深度画像の生成
+        # 最大値より遠いものには情報を付与する的な？
         depth_filterd_image = (depth_image > max_dist) * depth_image
         depth_gray_filterd_image = (depth_filterd_image * 255. /max_dist).reshape((HEIGHT, WIDTH)).astype(np.uint8)
 

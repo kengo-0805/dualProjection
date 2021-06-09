@@ -79,37 +79,6 @@ error_min = LARGE_VALUE  # 最適化の最良値（再投影誤差）
 image_data = None
 
 
-# ------------------------
-# RealSense
-# ------------------------
-WIDTH = 640 #RealSenseの縦横
-HEIGHT = 480
-
-# color format
-# データ形式の話
-color_stream, color_format = rs.stream.color, rs.format.bgr8
-depth_stream, depth_format = rs.stream.depth, rs.format.z16
-
-# ストリーミング初期化
-# RealSenseからデータを受信するための準備
-# config.enable_streamでRGB，Dの解像度とデータ形式，フレームレートを指定している
-config = rs.config()
-config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
-config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
-
-# ストリーミング開始
-pipeline = rs.pipeline()
-profile = pipeline.start(config)
-
-# 距離[m] = depth * depth_scale
-depth_sensor = profile.get_device().first_depth_sensor()
-depth_scale = depth_sensor.get_depth_scale()
-
-# Alignオブジェクト生成
-# RGBとDの画角の違いによるズレを修正している
-align_to = rs.stream.color
-align = rs.align(align_to)
-# max_dist = THRESHOLD / depth_scale
 
 # OpenGL の射影のパラメータ
 class Params:
@@ -1185,11 +1154,63 @@ def check_point3d_on_frame(points3d, frame, H, src_size):
         img_pj = cv2.circle(img_pj, (int(uv[0]), int(uv[1])), 3, [255, 0, 0], -1)
     preview(img_pj)
 
+def run_realsense():
+    # フレーム待ち（color&depth）
+    # フレーム取得
+    frames = pipeline.wait_for_frames()
+    # フレームの画角差を修正
+    aligned_frames = align.process(frames)
+    # フレームの切り分け
+    # 多分これに射影変換行列をかけたら視点の変更ができる
+    color_frame = aligned_frames.get_color_frame()
+    depth_frame = aligned_frames.get_depth_frame()
+    if not depth_frame or not color_frame:
+        continue
+
+    # RGB画像のフレームから画素値をnumpy配列に変換
+    # これで普通のRGB画像になる
+    color_image = np.asanyarray(color_frame.get_data())
+    # D画像のフレームから画素値をnumpy配列に変換
+    depth_image = np.asanyarray(depth_frame.get_data()) # 深度の画素値が入っている
+
 #-------------------------------
 # ここからがメイン部分
 #-------------------------------
 # メインの処理
 if __name__ == '__main__':
+
+    # ------------------------
+    # RealSense
+    # ------------------------
+    WIDTH = 640 #RealSenseの縦横
+    HEIGHT = 480
+
+    # color format
+    # データ形式の話
+    color_stream, color_format = rs.stream.color, rs.format.bgr8
+    depth_stream, depth_format = rs.stream.depth, rs.format.z16
+
+    # ストリーミング初期化
+    # RealSenseからデータを受信するための準備
+    # config.enable_streamでRGB，Dの解像度とデータ形式，フレームレートを指定している
+    config = rs.config()
+    config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
+    config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
+
+    # ストリーミング開始
+    pipeline = rs.pipeline()
+    profile = pipeline.start(config)
+
+    # 距離[m] = depth * depth_scale
+    depth_sensor = profile.get_device().first_depth_sensor()
+    depth_scale = depth_sensor.get_depth_scale()
+
+    # Alignオブジェクト生成
+    # RGBとDの画角の違いによるズレを修正している
+    align_to = rs.stream.color
+    align = rs.align(align_to)
+    # max_dist = THRESHOLD / depth_scale
+
 
     # アプリクラスのインスタンス
     state = AppState(PARAMS)
@@ -1256,9 +1277,10 @@ if __name__ == '__main__':
         # cv2.destroyAllWindows()
 
 
+    pyglet.clock.schedule(run_realsense())
 # Create and allocate memory for our color data
-color_profile = rs.video_stream_profile(profile.get_stream(color_stream)
-image_data = pyglet.image.ImageData(WIDTH, HEIGHT, convert_fmt(color_profile.format()), (gl.GLubyte * (cam_w * cam_h * 3))())
+# color_profile = rs.video_stream_profile(profile.get_stream(color_stream))
+# image_data = pyglet.image.ImageData(WIDTH, HEIGHT, convert_fmt(color_profile.format()), (gl.GLubyte * (cam_w * cam_h * 3))())
 
 try:
     # pygletのなにか？
