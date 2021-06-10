@@ -1282,9 +1282,9 @@ if __name__ == '__main__':
 # color_profile = rs.video_stream_profile(profile.get_stream(color_stream))
 # image_data = pyglet.image.ImageData(WIDTH, HEIGHT, convert_fmt(color_profile.format()), (gl.GLubyte * (cam_w * cam_h * 3))())
 
-try:
-    # pygletのなにか？
-    pyglet.app.run()
-finally:
-    pipeline.stop()
-    cv2.destroyAllWindows()
+# try:
+#     # pygletのなにか？
+#     pyglet.app.run()
+# finally:
+#     pipeline.stop()
+#     cv2.destroyAllWindows()
