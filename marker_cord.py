@@ -36,11 +36,12 @@ while True:
     # 可視化
     aruco.drawDetectedMarkers(img, corners, ids) 
     # resize the window
-    windowsize = (800, 600)
+    windowsize = (1600, 900) #正しくないかもしれない
     img = cv2.resize(img, windowsize)
     
 
     cv2.imshow('title',img)
+    # 終了条件
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 

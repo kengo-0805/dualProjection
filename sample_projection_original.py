@@ -36,10 +36,8 @@ import sys, os
 import math
 import numpy as np
 import cv2
-from numpy.core.fromnumeric import nonzero
 import scipy.optimize as opt
 import matplotlib.pyplot as plt
-import pyrealsense2 as rs
 
 from PIL import Image
 import pyglet
@@ -76,8 +74,6 @@ MAX_PLANE_NUM = 3    # シーンから検出する平面の最大数
 
 LARGE_VALUE = 99999      # 最適化の初期値（再投影誤差）
 error_min = LARGE_VALUE  # 最適化の最良値（再投影誤差）
-image_data = None
-
 
 
 # OpenGL の射影のパラメータ
@@ -109,9 +105,9 @@ modelview_matrix = None
 
 # [see] ボードの位置
 board_vertices = ((BOARD_X - BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z),
-                (BOARD_X - BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),
-                (BOARD_X + BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),
-                (BOARD_X + BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z))
+                  (BOARD_X - BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),
+                  (BOARD_X + BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),
+                  (BOARD_X + BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z))
 
 camera = None
 
@@ -346,14 +342,14 @@ def save_params():
                     state.cp3d_opengl, state.cp2d_projected, state.cp2d_cpoint,
                     state.H_pj_cm)):
         np.savez(PARAMS_FILE_PATH,
-                rpy = np.array([state.roll, state.pitch, state.yaw]),
-                trans = state.tvec,
-                rvec = state.rvec,
-                _camera_frame = state.camera_frame,
-                cp3d_opengl = state.cp3d_opengl,
-                cp2d_projected = state.cp2d_projected,
-                cp2d_cpoint = state.cp2d_cpoint,
-                H_pj_cm = state.H_pj_cm)
+                 rpy = np.array([state.roll, state.pitch, state.yaw]),
+                 trans = state.tvec,
+                 rvec = state.rvec,
+                 _camera_frame = state.camera_frame,
+                 cp3d_opengl = state.cp3d_opengl,
+                 cp2d_projected = state.cp2d_projected,
+                 cp2d_cpoint = state.cp2d_cpoint,
+                 H_pj_cm = state.H_pj_cm)
         print("Parameters are saved successfully.")
     else:
         print("Error: calibration is not finished, any parameters is not saved.")
@@ -388,14 +384,14 @@ def axes(size=1, width=1):
     """draw 3d axes"""
     gl.glLineWidth(width)
     pyglet.graphics.draw(6, gl.GL_LINES,
-                        ('v3f', (0, 0, 0, size, 0, 0,
-                                0, 0, 0, 0, size, 0,
-                                0, 0, 0, 0, 0, size)),
-                        ('c3f', (1, 0, 0, 1, 0, 0,
-                                0, 1, 0, 0, 1, 0,
-                                0, 0, 1, 0, 0, 1,
-                                ))
-                        )
+                         ('v3f', (0, 0, 0, size, 0, 0,
+                                  0, 0, 0, 0, size, 0,
+                                  0, 0, 0, 0, 0, size)),
+                         ('c3f', (1, 0, 0, 1, 0, 0,
+                                  0, 1, 0, 0, 1, 0,
+                                  0, 0, 1, 0, 0, 1,
+                                  ))
+                         )
 
 
 # 地面のグリッドの描画
@@ -700,8 +696,8 @@ def modelview():
     #            float upX, float upY, float upX
     # )
     gl.gluLookAt(0.0, 0.0, 0.0,
-                0.0, 0.0, -1.0,
-                0.0, 1.0, 0.0)
+                 0.0, 0.0, -1.0,
+                 0.0, 1.0, 0.0)
 
     #-------------------------------------
     # numpy 配列への変換
@@ -979,11 +975,11 @@ def optimize():
         range_t = 0.1   # [m]
         range_r = 1 * np.pi / 180  # [rad]
         ranges = (pslice(ps[0], range_t),
-                pslice(ps[1], range_t),
-                pslice(ps[2], range_t),
-                pslice(ps[3], range_r),
-                pslice(ps[4], range_r),
-                pslice(ps[5], range_r))
+                  pslice(ps[1], range_t),
+                  pslice(ps[2], range_t),
+                  pslice(ps[3], range_r),
+                  pslice(ps[4], range_r),
+                  pslice(ps[5], range_r))
         optimized_params = opt.brute(error_func, ranges=ranges, Ns=50, args=(_cp3d, _cp2d), disp=True, finish=opt.fmin)
 
     convert_params(optimized_params)
@@ -1126,12 +1122,12 @@ def check_control_points():
 
     v = 220
     colors = np.array([(v, 0, 0),
-                    (0, v, 0),
-                    (0, 0, v),
-                    (v, v, 0),
-                    (v, 0, v),
-                    (0, v, v),
-                    (v, v, v)])
+                       (0, v, 0),
+                       (0, 0, v),
+                       (v, v, 0),
+                       (v, 0, v),
+                       (0, v, v),
+                       (v, v, v)])
     colors = np.vstack((colors, colors/2))
     du, dv = 15, -15
     for ps in state.cp3d_opengl:
@@ -1154,66 +1150,15 @@ def check_point3d_on_frame(points3d, frame, H, src_size):
         img_pj = cv2.circle(img_pj, (int(uv[0]), int(uv[1])), 3, [255, 0, 0], -1)
     preview(img_pj)
 
-def run_realsense():
-    # フレーム待ち（color&depth）
-    # フレーム取得
-    frames = pipeline.wait_for_frames()
-    # フレームの画角差を修正
-    aligned_frames = align.process(frames)
-    # フレームの切り分け
-    # 多分これに射影変換行列をかけたら視点の変更ができる
-    color_frame = aligned_frames.get_color_frame()
-    depth_frame = aligned_frames.get_depth_frame()
-    # if not depth_frame or not color_frame:
-    #     continue
-
-    # RGB画像のフレームから画素値をnumpy配列に変換
-    # これで普通のRGB画像になる
-    color_image = np.asanyarray(color_frame.get_data())
-    # D画像のフレームから画素値をnumpy配列に変換
-    depth_image = np.asanyarray(depth_frame.get_data()) # 深度の画素値が入っている
-
 #-------------------------------
 # ここからがメイン部分
 #-------------------------------
 # メインの処理
 if __name__ == '__main__':
 
-    # ------------------------
-    # RealSense
-    # ------------------------
-    WIDTH = 640 #RealSenseの縦横
-    HEIGHT = 480
-
-    # color format
-    # データ形式の話
-    color_stream, color_format = rs.stream.color, rs.format.bgr8
-    depth_stream, depth_format = rs.stream.depth, rs.format.z16
-
-    # ストリーミング初期化
-    # RealSenseからデータを受信するための準備
-    # config.enable_streamでRGB，Dの解像度とデータ形式，フレームレートを指定している
-    config = rs.config()
-    config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
-    config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
-
-    # ストリーミング開始
-    pipeline = rs.pipeline()
-    profile = pipeline.start(config)
-
-    # 距離[m] = depth * depth_scale
-    depth_sensor = profile.get_device().first_depth_sensor()
-    depth_scale = depth_sensor.get_depth_scale()
-
-    # Alignオブジェクト生成
-    # RGBとDの画角の違いによるズレを修正している
-    align_to = rs.stream.color
-    align = rs.align(align_to)
-    # max_dist = THRESHOLD / depth_scale
-
-
     # アプリクラスのインスタンス
     state = AppState(PARAMS)
+
     #-------------------------------
     # ここから描画準備：Pyglet
     #-------------------------------
@@ -1270,21 +1215,10 @@ if __name__ == '__main__':
     load_global_correspondences(CORRESPONDENCES_CSV_PATH)
 
     # Start
-    # pyglet.app.run()
+    pyglet.app.run()
 
-    # if camera is not None:
-        # camera.release()
-        # cv2.destroyAllWindows()
+    if camera is not None:
+        camera.release()
+        cv2.destroyAllWindows()
 
 
-    pyglet.clock.schedule(run_realsense())
-# Create and allocate memory for our color data
-# color_profile = rs.video_stream_profile(profile.get_stream(color_stream))
-# image_data = pyglet.image.ImageData(WIDTH, HEIGHT, convert_fmt(color_profile.format()), (gl.GLubyte * (cam_w * cam_h * 3))())
-
-# try:
-#     # pygletのなにか？
-#     pyglet.app.run()
-# finally:
-#     pipeline.stop()
-#     cv2.destroyAllWindows()
