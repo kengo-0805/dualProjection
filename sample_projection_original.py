@@ -1017,7 +1017,9 @@ def get_camera_frame():
 def get_screen_capture():
     # pyglet.image.get_buffer_manager().get_color_buffer().save('out.png')
     scdata = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
-    img = np.asanyarray(scdata.get_data())
+    format = "RGBA"
+    pitch = scdata.width * len(format)
+    img = np.asanyarray(scdata.get_data(format, pitch))
 
     width, height = window.get_size()
     img = img.reshape(height, width, -1)

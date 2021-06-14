@@ -5,7 +5,7 @@ import cv2
 
 WIDTH = 640
 HEIGHT = 480
-THRESHOLD = 1.5 # これより近い距離の画素を無視する
+THRESHOLD = 0.4 # これより近い距離の画素を無視する
 
 # color format
 # データ形式の話
@@ -56,25 +56,6 @@ try:
         # これで普通のRGB画像になる
         color_image = np.asanyarray(color_frame.get_data())
         
-        #--------------------------------
-        # バウンディングボックス部分
-        #--------------------------------
-        # 形式変換
-        hsv = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
-        cv2.imshow("hsv image",hsv)
-        binary = cv2.inRange(hsv, (20, 0, 0), (50, 255, 255))
-        # 輪郭抽出
-        contours = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
-        # 面積が一定以上の輪郭のみ残す。
-        area_thresh = 10000
-        contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours))
-        # 輪郭を矩形で囲む。
-        for cnt in contours:
-            # 輪郭に外接する長方形を取得する。
-            x, y, width, height = cv2.boundingRect(cnt)
-            # 描画する。
-            cv2.rectangle(color_image, (x, y), (x + width, y + height), color=(0, 255, 0), thickness=2)
-
 
         # D画像のフレームから画素値をnumpy配列に変換
         depth_image = np.asanyarray(depth_frame.get_data()) # 深度の画素値が入っている
@@ -87,6 +68,28 @@ try:
 
         # 指定距離以下を無視したRGB画像の生成
         color_filterd_image = (depth_filterd_image.reshape((HEIGHT, WIDTH, 1)) > 0) * color_image
+
+        #--------------------------------
+        # バウンディングボックス部分
+        #--------------------------------
+        # 形式変換
+        hsv = cv2.cvtColor(color_filterd_image, cv2.COLOR_BGR2HSV)
+        cv2.imshow("hsv image",hsv)
+        binary = cv2.inRange(hsv, (0, 0, 0), (60, 255, 255))
+        cv2.imshow("niti",binary)
+        # 輪郭抽出
+        contours = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
+        # 面積が一定以上の輪郭のみ残す。
+        area_thresh = 10000
+        contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours))
+        # 輪郭を矩形で囲む。
+        for cnt in contours:
+            # 輪郭に外接する長方形を取得する。
+            x, y, width, height = cv2.boundingRect(cnt)
+            # 描画する。
+            cv2.rectangle(color_image, (x, y), (x + width, y + height), color=(0, 255, 0), thickness=2)
+            cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
+
 
 
         # # clipping_distance_in_metersm以内を画像化

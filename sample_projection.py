@@ -53,7 +53,7 @@ from plotter import Plotter
 #===============================
 
 TARGET_SCREEN_ID = 0     # プロジェクタのスクリーンID
-CAMERA_ID = 1            # カメラID
+CAMERA_ID = 1           # カメラID
 
 DATA_DIRNAME = "data"
 DATA_DIRPATH = os.path.join(os.path.dirname(__file__), DATA_DIRNAME)
@@ -1021,7 +1021,9 @@ def get_camera_frame():
 def get_screen_capture():
     # pyglet.image.get_buffer_manager().get_color_buffer().save('out.png')
     scdata = pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
-    img = np.asanyarray(scdata.get_data())
+    format = "RGBA"
+    pitch = scdata.width * len(format)
+    img = np.asanyarray(scdata.get_data(format, pitch))
 
     width, height = window.get_size()
     img = img.reshape(height, width, -1)
@@ -1270,7 +1272,7 @@ if __name__ == '__main__':
     load_global_correspondences(CORRESPONDENCES_CSV_PATH)
 
     # Start
-    # pyglet.app.run()
+    pyglet.app.run()
 
     # if camera is not None:
         # camera.release()
