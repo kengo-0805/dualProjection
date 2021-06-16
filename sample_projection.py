@@ -76,7 +76,7 @@ MAX_PLANE_NUM = 3    # シーンから検出する平面の最大数
 
 LARGE_VALUE = 99999      # 最適化の初期値（再投影誤差）
 error_min = LARGE_VALUE  # 最適化の最良値（再投影誤差）
-image_data = None
+
 
 
 
@@ -1187,32 +1187,32 @@ if __name__ == '__main__':
     WIDTH = 640 #RealSenseの縦横
     HEIGHT = 480
 
-    # color format
-    # データ形式の話
-    color_stream, color_format = rs.stream.color, rs.format.bgr8
-    depth_stream, depth_format = rs.stream.depth, rs.format.z16
+    # # color format
+    # # データ形式の話
+    # color_stream, color_format = rs.stream.color, rs.format.bgr8
+    # depth_stream, depth_format = rs.stream.depth, rs.format.z16
 
-    # ストリーミング初期化
-    # RealSenseからデータを受信するための準備
-    # config.enable_streamでRGB，Dの解像度とデータ形式，フレームレートを指定している
-    config = rs.config()
-    config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
-    config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
-
-    # ストリーミング開始
-    pipeline = rs.pipeline()
-    profile = pipeline.start(config)
-
-    # 距離[m] = depth * depth_scale
-    depth_sensor = profile.get_device().first_depth_sensor()
-    depth_scale = depth_sensor.get_depth_scale()
-
-    # Alignオブジェクト生成
-    # RGBとDの画角の違いによるズレを修正している
-    align_to = rs.stream.color
-    align = rs.align(align_to)
-    # max_dist = THRESHOLD / depth_scale
-
+    # # ストリーミング初期化
+    # # RealSenseからデータを受信するための準備
+    # # config.enable_streamでRGB，Dの解像度とデータ形式，フレームレートを指定している
+    # config = rs.config()
+    # config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
+    # config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
+    #
+    # # ストリーミング開始
+    # pipeline = rs.pipeline()
+    # profile = pipeline.start(config)
+    #
+    # # 距離[m] = depth * depth_scale
+    # depth_sensor = profile.get_device().first_depth_sensor()
+    # depth_scale = depth_sensor.get_depth_scale()
+    #
+    # # Alignオブジェクト生成
+    # # RGBとDの画角の違いによるズレを修正している
+    # align_to = rs.stream.color
+    # align = rs.align(align_to)
+    # # max_dist = THRESHOLD / depth_scale
+    #
 
     # アプリクラスのインスタンス
     state = AppState(PARAMS)
@@ -1274,12 +1274,12 @@ if __name__ == '__main__':
     # Start
     pyglet.app.run()
 
-    # if camera is not None:
-        # camera.release()
-        # cv2.destroyAllWindows()
+    if camera is not None:
+        camera.release()
+        cv2.destroyAllWindows()
 
 
-    pyglet.clock.schedule(run_realsense())
+    # pyglet.clock.schedule(run_realsense())
 # Create and allocate memory for our color data
 # color_profile = rs.video_stream_profile(profile.get_stream(color_stream))
 # image_data = pyglet.image.ImageData(WIDTH, HEIGHT, convert_fmt(color_profile.format()), (gl.GLubyte * (cam_w * cam_h * 3))())
