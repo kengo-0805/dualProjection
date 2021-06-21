@@ -2,6 +2,7 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+# import open3d as o3d
 
 WIDTH = 640
 HEIGHT = 480
@@ -51,6 +52,22 @@ try:
         depth_frame = aligned_frames.get_depth_frame()
         if not depth_frame or not color_frame:
             continue
+
+        coverage = [0]*64
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                dist = depth_frame.get_distance(x, y)
+                if 0 < dist and dist < 1:
+                    coverage[x//10] += 1
+
+            if y%20 is 19:
+                line = ""
+                for c in coverage:
+                    line += " .:nhBXWW"[c//25]
+                coverage = [0]*64
+                print(line)
+
+        # dist = depth_frame.get_distance(x, y)
 
         # RGB画像のフレームから画素値をnumpy配列に変換
         # これで普通のRGB画像になる
