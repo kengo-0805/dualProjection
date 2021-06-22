@@ -7,6 +7,7 @@ import cv2
 WIDTH = 640
 HEIGHT = 480
 THRESHOLD = 0.4 # これより近い距離の画素を無視する
+SCREEN = 1.0
 
 # color format
 # データ形式の話
@@ -53,19 +54,7 @@ try:
         if not depth_frame or not color_frame:
             continue
 
-        coverage = [0]*64
-        for y in range(HEIGHT):
-            for x in range(WIDTH):
-                dist = depth_frame.get_distance(x, y)
-                if 0 < dist and dist < 1:
-                    coverage[x//10] += 1
 
-            if y%20 is 19:
-                line = ""
-                for c in coverage:
-                    line += " .:nhBXWW"[c//25]
-                coverage = [0]*64
-                print(line)
 
         # dist = depth_frame.get_distance(x, y)
 
@@ -86,26 +75,43 @@ try:
         # 指定距離以下を無視したRGB画像の生成
         color_filterd_image = (depth_filterd_image.reshape((HEIGHT, WIDTH, 1)) > 0) * color_image
 
-        #--------------------------------
-        # バウンディングボックス部分
-        #--------------------------------
-        # 形式変換
-        hsv = cv2.cvtColor(color_filterd_image, cv2.COLOR_BGR2HSV)
-        cv2.imshow("hsv image",hsv)
-        binary = cv2.inRange(hsv, (0, 0, 0), (60, 255, 255))
-        cv2.imshow("niti",binary)
-        # 輪郭抽出
-        contours = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
-        # 面積が一定以上の輪郭のみ残す。
-        area_thresh = 10000
-        contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours))
-        # 輪郭を矩形で囲む。
-        for cnt in contours:
-            # 輪郭に外接する長方形を取得する。
-            x, y, width, height = cv2.boundingRect(cnt)
-            # 描画する。
-            cv2.rectangle(color_image, (x, y), (x + width, y + height), color=(0, 255, 0), thickness=2)
-            cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
+        # coverage = [0]*64
+        for y in range(HEIGHT):
+            for x in range(WIDTH):
+                dist = depth_frame.get_distance(x, y)
+                if THRESHOLD < dist and dist < SCREEN + 0.05: # 閾値以上スクリーン以下であれば
+                # リストにその座標を格納するかその画素を消してしまうか
+                    color_filterd_image[x, y] = [0, 0, 255]
+                #     coverage[x//10] += 1
+
+            # if y%20 is 19:
+            #     line = ""
+            #     for c in coverage:
+            #         line += " .:nhBXWW"[c//25]
+            #     coverage = [0]*64
+            #     print(line)
+
+
+        # #--------------------------------
+        # # バウンディングボックス部分
+        # #--------------------------------
+        # # 形式変換
+        # hsv = cv2.cvtColor(color_filterd_image, cv2.COLOR_BGR2HSV)
+        # # cv2.imshow("hsv image",hsv)
+        # binary = cv2.inRange(hsv, (0, 0, 0), (60, 255, 255))
+        # cv2.imshow("niti",binary)
+        # # 輪郭抽出
+        # contours = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
+        # # 面積が一定以上の輪郭のみ残す。
+        # area_thresh = 10000
+        # contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours))
+        # # 輪郭を矩形で囲む。
+        # for cnt in contours:
+        #     # 輪郭に外接する長方形を取得する。
+        #     x, y, width, height = cv2.boundingRect(cnt)
+        #     # 描画する。
+        #     cv2.rectangle(color_image, (x, y), (x + width, y + height), color=(0, 255, 0), thickness=2)
+        #     cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
 
 
 
