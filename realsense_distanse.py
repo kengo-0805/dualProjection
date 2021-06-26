@@ -95,23 +95,24 @@ try:
         # # バウンディングボックス部分
         # #--------------------------------
         # 形式変換
-        hsv = cv2.cvtColor(color_filterd_image, cv2.COLOR_BGR2HSV)
+        # hsv = cv2.cvtColor(color_filterd_image, cv2.COLOR_BGR2HSV)
         # cv2.imshow("hsv image",hsv)
-        binary = cv2.inRange(hsv, (0, 0, 0), (60, 255, 255))
+        binary = cv2.inRange(color_filterd_image, (0, 255, 0), (0, 255, 0))
         cv2.imshow("niti",binary)
         # 輪郭抽出
-        contours = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
+        # contours = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
         # 面積が一定以上の輪郭のみ残す。
         area_thresh = 10000
-        contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours)) #xを与えてそのエリアが閾値より大きければリスト
+        contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, binary)) #xを与えてそのエリアが閾値より大きければリスト
         # 輪郭を矩形で囲む。
         for cnt in contours:
             # 輪郭に外接する長方形を取得する。
             x, y, width, height = cv2.boundingRect(cnt)
             # 描画する。
             cv2.rectangle(color_image, (x, y), (x + width, y + height), color=(0, 255, 0), thickness=2)
-            cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
-
+            # cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
+            print("左上:{},{}".format(x,y))
+            print("右下:{},{}".format(x+width,y+height))
 
 
         # # clipping_distance_in_metersm以内を画像化
