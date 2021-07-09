@@ -7,7 +7,7 @@ import cv2
 WIDTH = 640
 HEIGHT = 480
 THRESHOLD = 0.2 # これより近い距離の画素を無視する
-SCREEN = 0.4
+SCREEN = 0.7
 # color format
 # データ形式の話
 color_stream, color_format = rs.stream.color, rs.format.bgr8
@@ -21,8 +21,8 @@ config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
 config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
 
 # ストリーミング開始
-pipeline = rs.pipeline()
-profile = pipeline.start(config)
+# pipeline = rs.pipeline()
+# profile = pipeline.start(config)
 
 # 距離[m] = depth * depth_scale
 depth_sensor = profile.get_device().first_depth_sensor()
