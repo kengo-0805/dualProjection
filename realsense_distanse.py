@@ -39,6 +39,23 @@ align = rs.align(align_to)
 # threshold = (WIDTH * HEIGHT * 3) * 0.9
 max_dist = THRESHOLD / depth_scale
 
+# # Realsense の内部パラメータの確認と保存
+# def show_and_save_intrinsic(intrinsic, saveFlag = False):
+#     # 内部パラメータの表示
+#     print("====================================")
+#     print("intrinsic parameters")
+#     print("====================================")
+#     print("\tintrinsic.width", intrinsic.width)
+#     print("\tintrinsic.height", intrinsic.height)
+#     print("\tintrinsic.fx", intrinsic.fx)
+#     print("\tintrinsic.fy", intrinsic.fy)
+#     print("\tintrinsic.ppx", intrinsic.ppx)
+#     print("\tintrinsic.ppy", intrinsic.ppy)
+
+#     if saveFlag:
+#         np.savez('intrinsic.npz', width = intrinsic.width, height = intrinsic.height, fx = intrinsic.fx, fy = intrinsic.fy, ppx = intrinsic.ppx, ppy = intrinsic.ppy)
+
+
 try:
     while True:
         # フレーム待ち（color&depth）
