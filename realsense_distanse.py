@@ -21,8 +21,8 @@ config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
 config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
 
 # ストリーミング開始
-# pipeline = rs.pipeline()
-# profile = pipeline.start(config)
+pipeline = rs.pipeline()
+profile = pipeline.start(config)
 
 # 距離[m] = depth * depth_scale
 depth_sensor = profile.get_device().first_depth_sensor()
@@ -130,8 +130,22 @@ try:
             # cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
             print("左上:{},{}".format(x,y))
             print("右下:{},{}".format(x+width,y+height))
-
-
+            # 左上
+            f = open("box_leftupcord.text","w")
+            f.write("{},{}".format(x,y))
+            f.close()
+            # 左下
+            f = open("box_leftdowncord.text","w")
+            f.write("{},{}".format(x,y+height))
+            f.close()
+            # 右下
+            f = open("box_rightupcord.text","w")
+            f.write("{},{}".format(x+width,y+height))
+            f.close()
+            # 右上
+            f = open("box_rightupcord.text","w")
+            f.write("{},{}".format(x+width,y))
+            f.close()
         # # clipping_distance_in_metersm以内を画像化
         # white_color = 255 # 背景色
         # depth_image_3d = np.dstack((depth_image, depth_image, depth_image))
