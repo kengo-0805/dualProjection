@@ -131,19 +131,19 @@ try:
             print("左上:{},{}".format(x,y))
             print("右下:{},{}".format(x+width,y+height))
             # 左上
-            f = open("box_leftupcord.text","w")
+            f = open("box_leftupcord.txt","w")
             f.write("{},{}".format(x,y))
             f.close()
             # 左下
-            f = open("box_leftdowncord.text","w")
+            f = open("box_leftdowncord.txt","w")
             f.write("{},{}".format(x,y+height))
             f.close()
             # 右下
-            f = open("box_rightupcord.text","w")
+            f = open("box_rightupcord.txt","w")
             f.write("{},{}".format(x+width,y+height))
             f.close()
             # 右上
-            f = open("box_rightupcord.text","w")
+            f = open("box_rightupcord.txt","w")
             f.write("{},{}".format(x+width,y))
             f.close()
         # # clipping_distance_in_metersm以内を画像化

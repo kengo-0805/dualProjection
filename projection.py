@@ -1,6 +1,6 @@
 """
 OpenGL Pointcloud viewer with http://pyglet.org
-
+?????
 Usage:
 ------
 Mouse:
@@ -41,7 +41,6 @@ from numpy.core.fromnumeric import nonzero
 import scipy.optimize as opt
 import matplotlib.pyplot as plt
 import pyrealsense2 as rs
-
 from PIL import Image
 import pyglet
 import pyglet.gl as gl
@@ -53,7 +52,7 @@ from plotter import Plotter
 # 定数
 #===============================
 
-TARGET_SCREEN_ID = 1     # プロジェクタのスクリーンID
+TARGET_SCREEN_ID = 0     # プロジェクタのスクリーンID
 CAMERA_ID = 1           # カメラID
 
 DATA_DIRNAME = "data"
@@ -66,7 +65,8 @@ CHESS_VNUM = 10      # 垂直方向個数
 CHESS_MARGIN = 50    # [px]h
 CHESS_BLOCKSIZE = 80 # [px]
 
-BOARD_WIDTH  = 0.33  # chessboard の横幅 [m]
+BOARD_WIDTH  = 0.33  # chessboard の横幅
+# [m]
 BOARD_HEIGHT = 0.45  # chessboard の縦幅 [m]
 BOARD_X = 0.         # chessboard の3次元位置X座標 [m]（右手系）
 BOARD_Y = 0.         # chessboard の3次元位置Y座標 [m]（右手系）
@@ -545,8 +545,25 @@ def on_key_press_impl(symbol, modifiers):
         state.draw_board ^= True
 
     if symbol == pyglet.window.key.C:
+        # pipeline = rs.pipeline()
+        # pipeline.start()
+        # pipeline.stop()
         on_draw_impl()
+        # print("CCCCCCCCCCC")
         state.set_control_points = True
+        # ストリーミング初期化
+        # RealSenseからデータを受信するための準備
+        # config.enable_streamでRGB，Dの解像度とデータ形式，フレームレートを指定している
+        # config = rs.config()
+        # config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
+        # config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
+        # print("stream")
+        # # ストリーミング開始
+        # pipeline = rs.pipeline()
+        # profile = pipeline.start(config)
+        # pipeline.start(config)
+        # print("config start")
+
 
     if symbol == pyglet.window.key.F:
         state.half_fov ^=True
@@ -593,9 +610,11 @@ def on_key_press_impl(symbol, modifiers):
 
     if symbol == pyglet.window.key.S:
         save_screen()
-
-    if symbol == pyglet.window.key.T:
-        pyglet.clock.schedule(run_realsense)
+    #
+    # if symbol == pyglet.window.key.T:
+    #     # pipeline = rs.pipeline()
+    #     # pipeline.start()
+    #     pyglet.clock.schedule(run_realsense)
 
     # if symbol == pyglet.window.key.X:
     #     window.set_fullscreen(fullscreen=False)
@@ -826,9 +845,14 @@ def overlay_points2d_on_frame(points2d, frame):
 # ここからコマンド関数
 #-------------------------------
 def obtain_control_point():
+    # pipeline = rs.pipeline()
+    # pipeline.stop()
     check_control_points()
 
     if get_camera_frame():
+        print("test", state.camera_frame)
+        # cv2.imshow("title",state.camera_frame)
+        print("obtain")
         state.cp2d_cpoint = [np.empty((0, 2)) for _ in range(len(state.cp3d_opengl))]
 
         pid = 0  # [see] まずは1つの平面のみを実装
@@ -838,6 +862,7 @@ def obtain_control_point():
 
         class _callback(Plotter.Callback):
             def on_quit(self):
+                print("on_quit")
                 plt.close('all')
                 window.set_fullscreen(fullscreen=True)
                 state.cp2d_cpoint[pid] = plotter.GetImagePointsArray()
@@ -855,7 +880,10 @@ def obtain_control_point():
         if len(p3ds_cg) == len(p2ds_sr):
             img_pj = overlay_points2d_on_frame(state.cp2d_cpoint[pid], state.camera_frame)
             preview(img_pj)
-
+        # パイプラインの開始
+        # pipeline = rs.pipeline()
+        # pipeline_profile = pipeline.start(config)
+        # device = Device(pipeline, pipeline_profile)
 
 def obtain_homography_matrix():
     check_control_points()
@@ -1229,143 +1257,125 @@ def convert_fmt(fmt):
     }[fmt]
 
 
-def run_realsense(dt):
-    global cam_w, cam_h
-    global image_data
-    global depth_frame, color_frame
-    global pcd
-    # global THRESHOLD 
-
-    THRESHOLD = 0.2
-    SCREEN = 0.4
-    max_dist = THRESHOLD / depth_scale
-    
-    window.set_caption("RealSense (%dx%d) %dFPS (%.2fms) %s" %
-                       (cam_w, cam_h, 0 if dt == 0 else 1.0 / dt, dt * 1000,
-                        "PAUSED" if state.paused else ""))
-
-    # ポーズ
-    if state.paused:
-        return
-
-    success, frames = pipeline.try_wait_for_frames(timeout_ms=0)
-    if not success:
-        return
-
-# ここからいつものループ処理を書く
-
-    # フレームの取得
-    aligned_frames = align.process(frames)
-    depth_frame = aligned_frames.get_depth_frame()
-    #color_frame = aligned_frames.first(color_stream)
-    color_frame = aligned_frames.get_color_frame()
-
-
-    # RGB画像のフレームから画素値をnumpy配列に変換
-    # これで普通のRGB画像になる
-    color_image = np.asanyarray(color_frame.get_data())
-    
-
-    # D画像のフレームから画素値をnumpy配列に変換
-    depth_image = np.asanyarray(depth_frame.get_data()) # 深度の画素値が入っている
-
-
-    # 指定距離以下を無視した深度画像の生成
-    # 最大値より遠いものには情報を付与する的な？
-    depth_filterd_image = (depth_image > max_dist) * depth_image
-    depth_gray_filterd_image = (depth_filterd_image * 255. /max_dist).reshape((HEIGHT, WIDTH)).astype(np.uint8)
-
-    # 指定距離以下を無視したRGB画像の生成
-    color_filterd_image = (depth_filterd_image.reshape((HEIGHT, WIDTH, 1)) > 0) * color_image
-
-    # coverage = [0]*64
-    for y in range(HEIGHT):
-        for x in range(WIDTH):
-            dist = depth_frame.get_distance(x, y)
-            if THRESHOLD < dist and dist < SCREEN + 0.05: # 閾値以上スクリーン以下であれば
-            # リストにその座標を格納するかその画素を消してしまうか
-                color_filterd_image[y, x] = [0, 255, 0]
-                
-
-    binary = cv2.inRange(color_filterd_image, (0, 254, 0), (0, 255, 0))
-    cv2.imshow("niti",binary)
-    # 輪郭抽出
-    contours = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
-    # 面積が一定以上の輪郭のみ残す。
-    area_thresh = 10000
-    contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours)) #xを与えてそのエリアが閾値より大きければリスト
-    # # 輪郭を矩形で囲む。
-    for cnt in contours:
-        # 輪郭に外接する長方形を取得する。
-        x, y, width, height = cv2.boundingRect(cnt)
-        # 描画する。
-        cv2.rectangle(color_image, (x, y), (x + width, y + height), color=(0, 255, 0), thickness=2)
-        # cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
-        print("左上:{},{}".format(x,y))
-        print("右下:{},{}".format(x+width,y+height))
-        # 表示
-        images = np.hstack((color_filterd_image, color_image))
-        cv2.imshow('Frames', images)
-        if cv2.waitKey(1) & 0xff == 27:
-            break
-
-    # #----------------------------------
-    # # フィルタ処理
-    # #----------------------------------
-    # # サブサンプリング
-    # depth_frame = decimate.process(depth_frame)
-
-    # # 後処理フィルタ
-    # if state.postprocessing:
-    #     for f in filters:
-    #         depth_frame = f.process(depth_frame)
-    # #----------------------------------
-
-    # # 内部パラメータの取得
-    # # Grab new intrinsics (may be changed by decimation)
-    # depth_intrinsics = rs.video_stream_profile(depth_frame.profile).get_intrinsics()
-    # cam_w, cam_h = depth_intrinsics.width, depth_intrinsics.height
-
-    # # 画像の取得
-    # color_image = np.asanyarray(color_frame.get_data())
-    # depth_image = np.asanyarray(depth_frame.get_data())
-
-    # # 深度画像の取得
-    # colorized_depth = colorizer.colorize(depth_frame)
-    # depth_colormap = np.asanyarray(colorized_depth.get_data())
-
-    # if state.color:
-    #     mapped_frame, color_source = color_frame, color_image
-    # else:
-    #     mapped_frame, color_source = colorized_depth, depth_colormap
-
-    # # 点群化
-    # points = pc.calculate(depth_frame)
-    # pc.map_to(mapped_frame)
-
-    # verts = np.asarray(points.get_vertices(2)).reshape(cam_h, cam_w, 3)
-    # texcoords = np.asarray(points.get_texture_coordinates(2))
-
-
-
-# def run_realsense():
-#     # フレーム待ち（color&depth）
-#     # フレーム取得
-#     frames = pipeline.wait_for_frames()
-#     # フレームの画角差を修正
+# def run_realsense(dt):
+#     global cam_w, cam_h
+#     global image_data
+#     global depth_frame, color_frame
+#     global pcd
+#     # global THRESHOLD
+#
+#     THRESHOLD = 0.2
+#     SCREEN = 0.4
+#     max_dist = THRESHOLD / depth_scale
+#
+#     window.set_caption("RealSense (%dx%d) %dFPS (%.2fms) %s" %
+#                        (cam_w, cam_h, 0 if dt == 0 else 1.0 / dt, dt * 1000,
+#                         "PAUSED" if state.paused else ""))
+#
+#     # ポーズ
+#     if state.paused:
+#         return
+#
+#     success, frames = pipeline.try_wait_for_frames(timeout_ms=0)
+#     if not success:
+#         return
+#
+# # ここからいつものループ処理を書く
+#
+#     # フレームの取得
 #     aligned_frames = align.process(frames)
-#     # フレームの切り分け
-#     # 多分これに射影変換行列をかけたら視点の変更ができる
-#     color_frame = aligned_frames.get_color_frame()
 #     depth_frame = aligned_frames.get_depth_frame()
-#     # if not depth_frame or not color_frame:
-#     #     continue
-
+#     #color_frame = aligned_frames.first(color_stream)
+#     color_frame = aligned_frames.get_color_frame()
+#
+#
 #     # RGB画像のフレームから画素値をnumpy配列に変換
 #     # これで普通のRGB画像になる
 #     color_image = np.asanyarray(color_frame.get_data())
+#
+#
 #     # D画像のフレームから画素値をnumpy配列に変換
 #     depth_image = np.asanyarray(depth_frame.get_data()) # 深度の画素値が入っている
+#
+#
+#     # 指定距離以下を無視した深度画像の生成
+#     # 最大値より遠いものには情報を付与する的な？
+#     depth_filterd_image = (depth_image > max_dist) * depth_image
+#     depth_gray_filterd_image = (depth_filterd_image * 255. /max_dist).reshape((HEIGHT, WIDTH)).astype(np.uint8)
+#
+#     # 指定距離以下を無視したRGB画像の生成
+#     color_filterd_image = (depth_filterd_image.reshape((HEIGHT, WIDTH, 1)) > 0) * color_image
+#
+#     # coverage = [0]*64
+#     for y in range(HEIGHT):
+#         for x in range(WIDTH):
+#             dist = depth_frame.get_distance(x, y)
+#             if THRESHOLD < dist and dist < SCREEN + 0.05: # 閾値以上スクリーン以下であれば
+#             # リストにその座標を格納するかその画素を消してしまうか
+#                 color_filterd_image[y, x] = [0, 255, 0]
+#
+#
+#     binary = cv2.inRange(color_filterd_image, (0, 254, 0), (0, 255, 0))
+#     # cv2.imshow("niti",binary)
+#     # 輪郭抽出
+#     contours = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[0]
+#     # 面積が一定以上の輪郭のみ残す。
+#     area_thresh = 10000
+#     contours = list(filter(lambda x: cv2.contourArea(x) > area_thresh, contours)) #xを与えてそのエリアが閾値より大きければリスト
+#     # # 輪郭を矩形で囲む。
+#     for cnt in contours:
+#         # 輪郭に外接する長方形を取得する。
+#         x, y, width, height = cv2.boundingRect(cnt)
+#         # 描画する。
+#         cv2.rectangle(color_image, (x, y), (x + width, y + height), color=(0, 255, 0), thickness=2)
+#         # cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
+#         print("左上:{},{}".format(x,y))
+#         print("右下:{},{}".format(x+width,y+height))
+#         # 表示
+#         images = np.hstack((color_filterd_image, color_image))
+#         # cv2.imshow('Frames', images)
+#         if cv2.waitKey(1) & 0xff == 27:
+#             break
+#
+#     # #----------------------------------
+#     # # フィルタ処理
+#     # #----------------------------------
+#     # # サブサンプリング
+#     # depth_frame = decimate.process(depth_frame)
+#
+#     # # 後処理フィルタ
+#     # if state.postprocessing:
+#     #     for f in filters:
+#     #         depth_frame = f.process(depth_frame)
+#     # #----------------------------------
+#
+#     # # 内部パラメータの取得
+#     # # Grab new intrinsics (may be changed by decimation)
+#     # depth_intrinsics = rs.video_stream_profile(depth_frame.profile).get_intrinsics()
+#     # cam_w, cam_h = depth_intrinsics.width, depth_intrinsics.height
+#
+#     # # 画像の取得
+#     # color_image = np.asanyarray(color_frame.get_data())
+#     # depth_image = np.asanyarray(depth_frame.get_data())
+#
+#     # # 深度画像の取得
+#     # colorized_depth = colorizer.colorize(depth_frame)
+#     # depth_colormap = np.asanyarray(colorized_depth.get_data())
+#
+#     # if state.color:
+#     #     mapped_frame, color_source = color_frame, color_image
+#     # else:
+#     #     mapped_frame, color_source = colorized_depth, depth_colormap
+#
+#     # # 点群化
+#     # points = pc.calculate(depth_frame)
+#     # pc.map_to(mapped_frame)
+#
+#     # verts = np.asarray(points.get_vertices(2)).reshape(cam_h, cam_w, 3)
+#     # texcoords = np.asarray(points.get_texture_coordinates(2))
+
+
+
 
 #-------------------------------
 # ここからがメイン部分
@@ -1454,101 +1464,112 @@ if __name__ == '__main__':
     def on_mouse_release(x, y, button, modifiers):
         on_mouse_button_impl(x, y, button, modifiers)
 
+    #
+    # #-------------------------------
+    # # ここから接続準備：一台目のみ接続
+    # #-------------------------------
+    # # コンテキストの獲得
+    # context = rs.context()
+    # device_info = []
+    # if len(context.devices) > 0:
+    #     device = context.devices[0]
+    #     if device.get_info(rs.camera_info.name).lower() != 'platform camera':
+    #         device_info = device.get_info(rs.camera_info.serial_number)
+    #     else:
+    #         sys.exit()
+    # else:
+    #     print("### Any device is not detected. ###")
+    #     sys.exit()
+    #
+    # # color format
+    # color_stream, color_format = rs.stream.color, rs.format.rgb8
+    # depth_stream, depth_format = rs.stream.depth, rs.format.z16
+    #
+    # # ストリーム(Color/Depth)の設定
+    # config = rs.config()
+    # config.enable_device(device_info)
+    # config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
+    # config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
+    #
+    # # 位置合わせ
+    # align_to = color_stream
+    # align = rs.align(align_to)
+    #
+    # # パイプラインの開始
+    # pipeline = rs.pipeline()
+    # print("pipeline")
+    # pipeline_profile = pipeline.start(config)
+    # device = Device(pipeline, pipeline_profile)
+    #
+    # # Set the acquisition parameters
+    # depth_sensor = pipeline_profile.get_device().first_depth_sensor()
+    # depth_sensor.set_option(rs.option.emitter_enabled, 0)
+    # depth_scale = depth_sensor.get_depth_scale()
 
-#-------------------------------
-# ここから接続準備：一台目のみ接続
-#-------------------------------
-# コンテキストの獲得
-context = rs.context()
+    # # 内部パラメータの獲得
+    # profile = pipeline.get_active_profile()
+    # depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
+    # depth_intrinsics = depth_profile.get_intrinsics()
+    # cam_w, cam_h = depth_intrinsics.width, depth_intrinsics.height
 
-device_info = []
-if len(context.devices) > 0:
-    device = context.devices[0]
-    if device.get_info(rs.camera_info.name).lower() != 'platform camera':
-        device_info = device.get_info(rs.camera_info.serial_number)
-    else:
-        sys.exit()
-else:
-    print("### Any device is not detected. ###")
-    sys.exit()
+    # # 内部パラメータの表示
+    # show_and_save_intrinsic(depth_intrinsics)
 
-# color format
-color_stream, color_format = rs.stream.color, rs.format.rgb8
-depth_stream, depth_format = rs.stream.depth, rs.format.z16
+    # # Processing blocks
+    # pc = rs.pointcloud()
+    # colorizer = rs.colorizer()
 
-# ストリーム(Color/Depth)の設定
-config = rs.config()
-config.enable_device(device_info)
-config.enable_stream(depth_stream, WIDTH, HEIGHT, depth_format, 30)
-config.enable_stream(color_stream, WIDTH, HEIGHT, color_format, 30)
+    # # フィルタ群
+    # decimate = rs.decimation_filter()
+    # decimate.set_option(rs.option.filter_magnitude, 2 ** state.decimate)
+    # filters = [rs.disparity_transform(),
+    #           rs.spatial_filter(),
+    #           rs.temporal_filter(),
+    #           rs.hole_filling_filter(),
+    #           rs.disparity_transform(False)]
+    # filters = [rs.hole_filling_filter()]
 
-# 位置合わせ
-align_to = color_stream
-align = rs.align(align_to)
+    #-------------------------------
+    # ここまで接続準備：一台目のみ接続
+    #-------------------------------
 
-# パイプラインの開始
-pipeline = rs.pipeline()
-pipeline_profile = pipeline.start(config)
-device = Device(pipeline, pipeline_profile)
+    #------------------------------
+    # OpenGL 用の変数の準備
+    #------------------------------
+    # チェスボードの作成
+    texture_ids = (pyglet.gl.GLuint * 1) ()
+    gl.glGenTextures(1, texture_ids)
+    load_chessboard()
+    load_global_correspondences(CORRESPONDENCES_CSV_PATH)
+    print("chess")
+    # Start
+    # pyglet.app.run()
 
-# Set the acquisition parameters
-depth_sensor = pipeline_profile.get_device().first_depth_sensor()
-depth_sensor.set_option(rs.option.emitter_enabled, 0)
-depth_scale = depth_sensor.get_depth_scale()
-
-# # 内部パラメータの獲得
-# profile = pipeline.get_active_profile()
-# depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
-# depth_intrinsics = depth_profile.get_intrinsics()
-# cam_w, cam_h = depth_intrinsics.width, depth_intrinsics.height
-
-# # 内部パラメータの表示
-# show_and_save_intrinsic(depth_intrinsics)
-
-# # Processing blocks
-# pc = rs.pointcloud()
-# colorizer = rs.colorizer()
-
-# # フィルタ群
-# decimate = rs.decimation_filter()
-# decimate.set_option(rs.option.filter_magnitude, 2 ** state.decimate)
-# filters = [rs.disparity_transform(),
-#           rs.spatial_filter(),
-#           rs.temporal_filter(),
-#           rs.hole_filling_filter(),
-#           rs.disparity_transform(False)]
-# filters = [rs.hole_filling_filter()]
-
-#-------------------------------
-# ここまで接続準備：一台目のみ接続
-#-------------------------------
-
-#------------------------------
-# OpenGL 用の変数の準備
-#------------------------------
-# チェスボードの作成
-texture_ids = (pyglet.gl.GLuint * 1) ()
-gl.glGenTextures(1, texture_ids)
-load_chessboard()
-# load_global_correspondences(CORRESPONDENCES_CSV_PATH)
-
-# Start
-# pyglet.app.run()
-
-if camera is not None:
-    camera.release()
-    cv2.destroyAllWindows()
+    if camera is not None:
+        camera.release()
+        cv2.destroyAllWindows()
 
 
-    # pyglet.clock.schedule(run_realsense())
-# Create and allocate memory for our color data
-# color_profile = rs.video_stream_profile(profile.get_stream(color_stream))
-# image_data = pyglet.image.ImageData(WIDTH, HEIGHT, convert_fmt(color_profile.format()), (gl.GLubyte * (cam_w * cam_h * 3))())
+        # pyglet.clock.schedule(run_realsense())
+    # Create and allocate memory for our color data
+    # color_profile = rs.video_stream_profile(profile.get_stream(color_stream))
+    # image_data = pyglet.image.ImageData(WIDTH, HEIGHT, convert_fmt(color_profile.format()), (gl.GLubyte * (cam_w * cam_h * 3))())
 
-# pyglet.clock.schedule(run_realsense)
+    # pyglet.clock.schedule(run_realsense)
 
-try:
-    # pygletのなにか？
+    # try:
+    #     # pygletのなにか？
+    #     pyglet.app.run()
+    #     # print("try")
+    # finally:
+    #     pipeline.stop()
+
+    # Start
     pyglet.app.run()
-finally:
-    pipeline.stop()
+
+    if camera is not None:
+        camera.release()
+        cv2.destroyAllWindows()
+
+
+
