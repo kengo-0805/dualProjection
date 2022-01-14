@@ -50,24 +50,24 @@ from plotter import Plotter
 # 定数
 #===============================
 
-TARGET_SCREEN_ID = 0     # プロジェクタのスクリーンID
-CAMERA_ID = 1            # カメラID
+TARGET_SCREEN_ID = 1     # プロジェクタのスクリーンID
+CAMERA_ID = 2       # カメラID
 
 DATA_DIRNAME = "data"
 DATA_DIRPATH = os.path.join(os.path.dirname(__file__), DATA_DIRNAME)
 if not os.path.exists(DATA_DIRPATH):
     os.makedirs(DATA_DIRPATH)
 
-CHESS_HNUM = 7       # 水平方向個数
-CHESS_VNUM = 10      # 垂直方向個数
-CHESS_MARGIN = 50    # [px]h
+CHESS_HNUM = 16       # 水平方向個数
+CHESS_VNUM = 9      # 垂直方向個数
+CHESS_MARGIN = 0    # [px]h
 CHESS_BLOCKSIZE = 80 # [px]
 
-BOARD_WIDTH  = 0.33  # chessboard の横幅 [m]
-BOARD_HEIGHT = 0.45  # chessboard の縦幅 [m]
+BOARD_WIDTH  = 0.67  # chessboard の横幅 [m]
+BOARD_HEIGHT = 0.38  # chessboard の縦幅 [m]
 BOARD_X = 0.         # chessboard の3次元位置X座標 [m]（右手系）
 BOARD_Y = 0.         # chessboard の3次元位置Y座標 [m]（右手系）
-BOARD_Z = -1.5       # chessboard の3次元位置Z座標 [m]（右手系）[see]
+BOARD_Z = -1.74       # chessboard の3次元位置Z座標 [m]（右手系）[see]
 
 DEPTH_LIMIT = 2.0    # 点群処理をする最大の距離 [m]
 MAX_PLANE_NUM = 3    # シーンから検出する平面の最大数
@@ -78,7 +78,7 @@ error_min = LARGE_VALUE  # 最適化の最良値（再投影誤差）
 
 # OpenGL の射影のパラメータ
 class Params:
-    def __init__(self, zNear = 0.0001, zFar = 20.0, fovy = 21.0):
+    def __init__(self, zNear = 0.0001, zFar = 20.0, fovy = 20.0):
         self.Z_NEAR = zNear     # 最も近い点 [m]
         self.Z_FAR  = zFar      # 最も遠い点 [m]
         self.FOVY   = fovy      # 縦の視野角 [deg]
@@ -86,7 +86,7 @@ class Params:
 
 PARAMS = Params(zNear = 0.0001, # [m]
                 zFar = 20.0,    # [m]
-                fovy = 21.0     # [deg]
+                fovy = 20.0     # [deg]
                 )
 
 #===============================
@@ -104,10 +104,10 @@ projection_matrix = None
 modelview_matrix = None
 
 # [see] ボードの位置
-board_vertices = ((BOARD_X - BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z),
-                  (BOARD_X - BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),
-                  (BOARD_X + BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),
-                  (BOARD_X + BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z))
+board_vertices = ((BOARD_X - BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT / 2, BOARD_Z),
+                  (BOARD_X - BOARD_WIDTH / 2, BOARD_Y - BOARD_HEIGHT / 2, BOARD_Z),
+                  (BOARD_X + BOARD_WIDTH / 2, BOARD_Y - BOARD_HEIGHT / 2, BOARD_Z),
+                  (BOARD_X + BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT / 2, BOARD_Z))
 
 camera = None
 
@@ -116,7 +116,7 @@ TARGET_VNUM = 5       # チェッカーボード上のマーカ個数（垂直�
 TARGET_DIAMETER = 10  # チェッカーボード上のマーカサイズ（直径）
 
 # [see] 3次元標定点（マーカ）の設定
-POINTS_3D_CSV = 'points3d.csv'
+POINTS_3D_CSV = 'points3d_1.csv'
 CORRESPONDENCES_CSV_PATH = os.path.join(DATA_DIRPATH, POINTS_3D_CSV)
 
 # [see] 最適化結果の保存先ファイル
@@ -158,7 +158,7 @@ class AppState:
         self.draw_grid = False
         self.draw_board = True
 
-        self.half_fov = True                  # プロジェクタの画角の変数
+        self.half_fov = False                  # プロジェクタの画角の変数
         self.obtain_homography_matrix = False # ホモグラフィの推定モード
         self.set_control_points = False       # 標定点の設定モード
 
@@ -257,7 +257,7 @@ def copy(dst, src):
 
 
 def make_chessboard(num_h, num_v, margin, block_size):
-    chessboard = np.ones((block_size * num_v + margin * 2, block_size * num_h + margin * 2, 3), dtype=np.uint8) * 255
+    chessboard = np.ones((block_size * num_v + margin * 2, block_size * num_h + margin * 2, 3), dtype=np.uint8) * [255, 165, 0][::-1]
     
     for y in range(num_v):
         for x in range(num_h):
@@ -296,6 +296,7 @@ def load_chessboard():
 
     chessboard = make_chessboard(CHESS_HNUM, CHESS_VNUM, CHESS_MARGIN, CHESS_BLOCKSIZE)
     chessboard = add_control_points(chessboard, TARGET_HNUM, TARGET_VNUM)
+    print("a")
 
     filepath = os.path.join(DATA_DIRPATH, 'chessboard.png')
     cv2.imwrite(filepath, chessboard)
@@ -561,6 +562,7 @@ def on_key_press_impl(symbol, modifiers):
 
     if symbol == pyglet.window.key.O:
         optimize()
+        np.savetxt("modelview_matrix.txt", modelview_matrix)
 
     # [debug]
     if symbol == pyglet.window.key.P:
@@ -647,9 +649,10 @@ def projection():
     #-----------------
     # [see] 新手法
     #-----------------
+    fov = PARAMS.FOVY*0.5
     aspect = width / float(height)
-    top = state.zNear * np.tan(np.radians(PARAMS.FOVY))
-    bottom = -state.zNear * np.tan(np.radians(PARAMS.FOVY))
+    top = state.zNear * np.tan(np.radians(fov))
+    bottom = -state.zNear * np.tan(np.radians(fov))
     left = - top * aspect
     right = top * aspect
 
@@ -862,6 +865,8 @@ def obtain_homography_matrix():
 
         # プロジェクション ＋ カメラ撮影のホモグラフィ行列の推定
         H = estimate_homography(pid)
+        inv_H = np.linalg.inv(H)
+        np.savetxt("homography_pjcm.txt", inv_H)
         if H is not None:
             state.H_pj_cm = H
             check_H_pj_cm(state.cp3d_opengl[pid], state.H_pj_cm, points2d_overlay=state.cp2d_projected[pid])

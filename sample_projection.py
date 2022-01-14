@@ -1,3 +1,5 @@
+# 中間発表用にパラメータをいじったもの
+#
 """
 OpenGL Pointcloud viewer with http://pyglet.org
 
@@ -32,6 +34,7 @@ Keyboard:
 
 """
 
+# from Users.horiikengo.Documents.Python.dualProjection.realsense_distanse import SCREEN, THRESHOLD
 import sys, os
 import math
 import numpy as np
@@ -40,7 +43,6 @@ from numpy.core.fromnumeric import nonzero
 import scipy.optimize as opt
 import matplotlib.pyplot as plt
 import pyrealsense2 as rs
-
 from PIL import Image
 import pyglet
 import pyglet.gl as gl
@@ -52,7 +54,7 @@ from plotter import Plotter
 # 定数
 #===============================
 
-TARGET_SCREEN_ID = 0     # プロジェクタのスクリーンID
+TARGET_SCREEN_ID = 1     # プロジェクタのスクリーンID
 CAMERA_ID = 1           # カメラID
 
 DATA_DIRNAME = "data"
@@ -60,16 +62,16 @@ DATA_DIRPATH = os.path.join(os.path.dirname(__file__), DATA_DIRNAME)
 if not os.path.exists(DATA_DIRPATH):
     os.makedirs(DATA_DIRPATH)
 
-CHESS_HNUM = 7       # 水平方向個数
-CHESS_VNUM = 10      # 垂直方向個数
-CHESS_MARGIN = 50    # [px]h
+CHESS_HNUM = 16       # 水平方向個数
+CHESS_VNUM = 9      # 垂直方向個数
+CHESS_MARGIN = 0    # [px]h
 CHESS_BLOCKSIZE = 80 # [px]
 
-BOARD_WIDTH  = 0.33  # chessboard の横幅 [m]
+BOARD_WIDTH  = 0.8  # chessboard の横幅[m]
 BOARD_HEIGHT = 0.45  # chessboard の縦幅 [m]
 BOARD_X = 0.         # chessboard の3次元位置X座標 [m]（右手系）
 BOARD_Y = 0.         # chessboard の3次元位置Y座標 [m]（右手系）
-BOARD_Z = -1.5       # chessboard の3次元位置Z座標 [m]（右手系）[see]
+BOARD_Z = -1.6       # chessboard の3次元位置Z座標 [m]（右手系）[see]
 
 DEPTH_LIMIT = 2.0    # 点群処理をする最大の距離 [m]
 MAX_PLANE_NUM = 3    # シーンから検出する平面の最大数
@@ -82,7 +84,7 @@ error_min = LARGE_VALUE  # 最適化の最良値（再投影誤差）
 
 # OpenGL の射影のパラメータ
 class Params:
-    def __init__(self, zNear = 0.0001, zFar = 20.0, fovy = 21.0):
+    def __init__(self, zNear = 0.0001, zFar = 20.0, fovy = 20.0):
         self.Z_NEAR = zNear     # 最も近い点 [m]
         self.Z_FAR  = zFar      # 最も遠い点 [m]
         self.FOVY   = fovy      # 縦の視野角 [deg]
@@ -90,8 +92,18 @@ class Params:
 
 PARAMS = Params(zNear = 0.0001, # [m]
                 zFar = 20.0,    # [m]
-                fovy = 21.0     # [deg]
+                fovy = 20.0     # [deg]
                 )
+
+#===============================
+# クラス
+#===============================
+# realsense device
+class Device:
+    def __init__(self, pipeline, pipeline_profile):
+        self.pipeline = pipeline
+        self.pipeline_profile = pipeline_profile
+
 
 #===============================
 # グローバル変数
@@ -108,10 +120,10 @@ projection_matrix = None
 modelview_matrix = None
 
 # [see] ボードの位置
-board_vertices = ((BOARD_X - BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z),
-                (BOARD_X - BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),
-                (BOARD_X + BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),
-                (BOARD_X + BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z))
+board_vertices = ((BOARD_X - BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT / 2, BOARD_Z),
+                (BOARD_X - BOARD_WIDTH / 2, BOARD_Y - BOARD_HEIGHT / 2, BOARD_Z),
+                (BOARD_X + BOARD_WIDTH / 2, BOARD_Y - BOARD_HEIGHT / 2, BOARD_Z),
+                (BOARD_X + BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT / 2, BOARD_Z))
 
 camera = None
 
@@ -120,7 +132,7 @@ TARGET_VNUM = 5       # チェッカーボード上のマーカ個数（垂直�
 TARGET_DIAMETER = 10  # チェッカーボード上のマーカサイズ（直径）
 
 # [see] 3次元標定点（マーカ）の設定
-POINTS_3D_CSV = 'points3d.csv'
+POINTS_3D_CSV = 'points3d_1.csv'
 CORRESPONDENCES_CSV_PATH = os.path.join(DATA_DIRPATH, POINTS_3D_CSV)
 
 # [see] 最適化結果の保存先ファイル
@@ -147,6 +159,9 @@ class AppState:
         self.yaw = math.radians(0)
         self.tvec = np.array([0, 0, 0], np.float32)
         self.rvec = np.array([0, 0, 0], np.float32)
+        self.translation = np.array([0, 0, 0], np.float32)
+        self.distance = 0
+        self.paused = False
 
         # キャリブレーションパラメータ
         self.camera_frame = None
@@ -162,7 +177,7 @@ class AppState:
         self.draw_grid = False
         self.draw_board = True
 
-        self.half_fov = True                  # プロジェクタの画角の変数
+        self.half_fov = False                  # プロジェクタの画角の変数
         self.obtain_homography_matrix = False # ホモグラフィの推定モード
         self.set_control_points = False       # 標定点の設定モード
 
@@ -261,7 +276,7 @@ def copy(dst, src):
 
 
 def make_chessboard(num_h, num_v, margin, block_size):
-    chessboard = np.ones((block_size * num_v + margin * 2, block_size * num_h + margin * 2, 3), dtype=np.uint8) * 255
+    chessboard = np.ones((block_size * num_v + margin * 2, block_size * num_h + margin * 2, 3), dtype=np.uint8) * [255, 165, 0][::-1]
     
     for y in range(num_v):
         for x in range(num_h):
@@ -355,6 +370,7 @@ def save_params():
                 cp2d_cpoint = state.cp2d_cpoint,
                 H_pj_cm = state.H_pj_cm)
         print("Parameters are saved successfully.")
+        np.savetxt("homography_pjcm.txt", state.H_pj_cm)
     else:
         print("Error: calibration is not finished, any parameters is not saved.")
 
@@ -533,7 +549,7 @@ def on_key_press_impl(symbol, modifiers):
     if symbol == pyglet.window.key.C:
         on_draw_impl()
         state.set_control_points = True
-
+   
     if symbol == pyglet.window.key.F:
         state.half_fov ^=True
 
@@ -580,6 +596,9 @@ def on_key_press_impl(symbol, modifiers):
     if symbol == pyglet.window.key.S:
         save_screen()
 
+    if symbol == pyglet.window.key.T:
+        pyglet.clock.schedule(run_realsense)
+
     # if symbol == pyglet.window.key.X:
     #     window.set_fullscreen(fullscreen=False)
     #     plotter = Plotter()
@@ -592,6 +611,8 @@ def on_key_press_impl(symbol, modifiers):
 
     if symbol == pyglet.window.key.Z:
         save_params()
+        np.savetxt("modelview_matrix.txt", modelview_matrix)
+        np.savetxt("projection_matrix.txt", projection_matrix)
 
     if symbol == pyglet.window.key.UP:
         state.zNear += state.delta_zNear
@@ -651,9 +672,10 @@ def projection():
     #-----------------
     # [see] 新手法
     #-----------------
+    fov = PARAMS.FOVY*0.5
     aspect = width / float(height)
-    top = state.zNear * np.tan(np.radians(PARAMS.FOVY))
-    bottom = -state.zNear * np.tan(np.radians(PARAMS.FOVY))
+    top = state.zNear * np.tan(np.radians(fov))
+    bottom = -state.zNear * np.tan(np.radians(fov))
     left = - top * aspect
     right = top * aspect
 
@@ -677,7 +699,14 @@ def projection():
     gl.glLoadMatrixf((ctypes.c_float * 16)(*pm))
 
     projection_matrix = np.array(pm).reshape(4,4).transpose()
-    # print(projection_matrix)
+    # CG内の行列
+    # print("projection:{}".format(projection_matrix))
+    # # f = open("projection_matrix.txt","w")
+    # # f.write("{}".format(projection_matrix))
+    # np.savetxt("projection_matrix.txt", projection_matrix)
+    # print("CG内の内部パラメータOK")
+
+    # f.close()
 
 
 def modelview():
@@ -708,7 +737,11 @@ def modelview():
     mm = (gl.GLfloat * 16)()
     gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mm)
     modelview_matrix = np.array(mm).reshape(4, 4).transpose()
-
+    # print("modelview:{}".format(modelview_matrix))
+    # f = open("modelview_matrix.txt","w")
+    # f.write("{}".format(modelview_matrix))
+    # f.close()
+    # np.savetxt("modelview_matrix.txt", modelview_matrix)
     #-------------------------------------
     # 回転ベクトルへの変換
     R = modelview_matrix[0:3, 0:3]
@@ -736,6 +769,7 @@ def world2cam(point3d, mv_matrix, pj_matrix, img_size):
 
     # 同次座標の不定性の解消（s_1 = _point2d[2]）
     (w, h) = img_size
+    # print("wh",img_size)
     u = (int)(w / 2 * (_point2d[0] / _point2d[2] + 1))
     v = (int)(h - h / 2 * (_point2d[1] / _point2d[2] + 1))
 
@@ -765,6 +799,16 @@ def on_draw_impl():
 
     projection()
     modelview()
+
+    # hidariue = (BOARD_X - BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z)
+    # w, h = window.get_size()
+    # # print("w, h", w, h)
+    # (u, v) = world2cam(hidariue, modelview_matrix, projection_matrix, (w, h))
+    # # (u, v) = world2cam(p, modelview_matrix, projection_matrix, (w, h))
+    # # print("uvuv", u,v)
+    # img = cv2.imread("q.png")
+    # img = cv2.circle(img, (u, v), 15, (0, 255, 0), thickness=-1)
+    # cv2.imwrite("p.png", img)
 
     #====================================================
     if state.draw_board:
@@ -812,6 +856,9 @@ def obtain_control_point():
     check_control_points()
 
     if get_camera_frame():
+        # print("test", state.camera_frame)
+        # cv2.imshow("title",state.camera_frame)
+        # print("obtain")
         state.cp2d_cpoint = [np.empty((0, 2)) for _ in range(len(state.cp3d_opengl))]
 
         pid = 0  # [see] まずは1つの平面のみを実装
@@ -821,6 +868,7 @@ def obtain_control_point():
 
         class _callback(Plotter.Callback):
             def on_quit(self):
+                # print("on_quit")
                 plt.close('all')
                 window.set_fullscreen(fullscreen=True)
                 state.cp2d_cpoint[pid] = plotter.GetImagePointsArray()
@@ -838,7 +886,7 @@ def obtain_control_point():
         if len(p3ds_cg) == len(p2ds_sr):
             img_pj = overlay_points2d_on_frame(state.cp2d_cpoint[pid], state.camera_frame)
             preview(img_pj)
-
+   
 
 def obtain_homography_matrix():
     check_control_points()
@@ -866,6 +914,13 @@ def obtain_homography_matrix():
 
         # プロジェクション ＋ カメラ撮影のホモグラフィ行列の推定
         H = estimate_homography(pid)
+        # print("homography_pjcm:{}".format(H))
+        # inv_H = np.linalg.inv(H)
+        # f = open("homography_pjcm.txt","w")
+        # f.write("{}".format(inv_H))
+        # f.close()
+        # np.savetxt("homography_pjcm.txt", H)
+
         if H is not None:
             state.H_pj_cm = H
             check_H_pj_cm(state.cp3d_opengl[pid], state.H_pj_cm, points2d_overlay=state.cp2d_projected[pid])
@@ -1156,24 +1211,10 @@ def check_point3d_on_frame(points3d, frame, H, src_size):
         img_pj = cv2.circle(img_pj, (int(uv[0]), int(uv[1])), 3, [255, 0, 0], -1)
     preview(img_pj)
 
-def run_realsense():
-    # フレーム待ち（color&depth）
-    # フレーム取得
-    frames = pipeline.wait_for_frames()
-    # フレームの画角差を修正
-    aligned_frames = align.process(frames)
-    # フレームの切り分け
-    # 多分これに射影変換行列をかけたら視点の変更ができる
-    color_frame = aligned_frames.get_color_frame()
-    depth_frame = aligned_frames.get_depth_frame()
-    # if not depth_frame or not color_frame:
-    #     continue
 
-    # RGB画像のフレームから画素値をnumpy配列に変換
-    # これで普通のRGB画像になる
-    color_image = np.asanyarray(color_frame.get_data())
-    # D画像のフレームから画素値をnumpy配列に変換
-    depth_image = np.asanyarray(depth_frame.get_data()) # 深度の画素値が入っている
+
+
+
 
 #-------------------------------
 # ここからがメイン部分
@@ -1262,6 +1303,9 @@ if __name__ == '__main__':
     def on_mouse_release(x, y, button, modifiers):
         on_mouse_button_impl(x, y, button, modifiers)
 
+
+
+
     #------------------------------
     # OpenGL 用の変数の準備
     #------------------------------
@@ -1279,14 +1323,10 @@ if __name__ == '__main__':
         cv2.destroyAllWindows()
 
 
-    # pyglet.clock.schedule(run_realsense())
-# Create and allocate memory for our color data
-# color_profile = rs.video_stream_profile(profile.get_stream(color_stream))
-# image_data = pyglet.image.ImageData(WIDTH, HEIGHT, convert_fmt(color_profile.format()), (gl.GLubyte * (cam_w * cam_h * 3))())
 
-# try:
-#     # pygletのなにか？
-#     pyglet.app.run()
-# finally:
-#     pipeline.stop()
-#     cv2.destroyAllWindows()
+
+    # try:
+    #     # pygletのなにか？
+    #     pyglet.app.run()
+    # finally:
+    #     pipeline.stop()
