@@ -2,12 +2,14 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+from PIL import Image
+import math
 # import open3d as o3d
 
 WIDTH = 640
 HEIGHT = 480
-THRESHOLD = 0.7 # これより近い距離の画素を無視する
-SCREEN = 1.6
+THRESHOLD = 0.9 # これより近い距離の画素を無視する
+SCREEN = 1.4
 
 TARGET = 0.1 # 対象物のスクリーンからの距離
 # color format
@@ -86,6 +88,7 @@ try:
         # RGB画像のフレームから画素値をnumpy配列に変換
         # これで普通のRGB画像になる
         color_image = np.asanyarray(color_frame.get_data())
+        cv2.imwrite("align_img_.png", color_image)
         
 
         # D画像のフレームから画素値をnumpy配列に変換
@@ -139,7 +142,7 @@ try:
             # 輪郭に外接する長方形を取得する。
             x, y, width, height = cv2.boundingRect(cnt)
             # 描画する。
-            cv2.rectangle(color_image, (x, y), (x + width, y + height), color=(0, 255, 0), thickness=2)
+            cv2.rectangle(color_image, (x - 10, y - 10), (x + width + 5, y + height), color=(0, 255, 0), thickness=2)
             # cv2.polylines(color_image, cnt, True, (255, 0, 0), 5)
             print("左上:{},{}".format(x, y))
             print("右下:{},{}".format(x + width, y + height))
@@ -184,6 +187,10 @@ try:
             xyz = np.append(xyz, [xyz_cord])
             print("object pos = {}".format(xyz))
         xyz = xyz.reshape([4, 3])
+        tate = math.sqrt((xyz[0][0]-xyz[1][0])*(xyz[0][0]-xyz[1][0]) + (xyz[0][1]-xyz[1][1])*(xyz[0][1]-xyz[1][1]) +(xyz[0][2]-xyz[1][2])*(xyz[0][2]-xyz[1][2]))
+        print("縦:{}[m]".format(tate))
+        yoko = math.sqrt((xyz[1][0]-xyz[2][0])*(xyz[1][0]-xyz[2][0]) + (xyz[1][1]-xyz[2][1])*(xyz[1][1]-xyz[2][1]) +(xyz[1][2]-xyz[2][2])*(xyz[1][2]-xyz[2][2]))
+        print("横:{}[m]".format(yoko))
 
         np.savetxt("obj_xyz.txt", xyz)
         # # clipping_distance_in_metersm以内を画像化

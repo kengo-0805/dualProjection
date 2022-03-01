@@ -863,7 +863,11 @@ def obtain_control_point():
 
         pid = 0  # [see] まずは1つの平面のみを実装
         window.set_fullscreen(fullscreen=False)
-        plotter = Plotter(imgarray=state.camera_frame)
+        # plotter = Plotter(imgarray=state.camera_frame)
+        camera_frame = cv2.imread("./align/align_img_c4.png")
+        camera_frame = cv2.cvtColor(camera_frame, cv2.COLOR_RGB2BGR)
+        plotter = Plotter(imgarray=camera_frame)
+        # plotter = np.array(Image.open('./align/align_img_c.png'))
         move_plotter()
 
         class _callback(Plotter.Callback):
@@ -896,7 +900,11 @@ def obtain_homography_matrix():
 
         pid = 0  # [see] まずは1つの平面のみを実装
 
-        plotter = Plotter(imgarray=state.camera_frame)
+        # plotter = Plotter(imgarray=state.camera_frame)
+        # plotter = np.array(Image.open('./align/align_img_h.png'))
+        camera_frame = cv2.imread("./align/align_img_h4.png")
+        camera_frame = cv2.cvtColor(camera_frame, cv2.COLOR_RGB2BGR)
+        plotter = Plotter(imgarray=camera_frame)
         move_plotter()
         class _callback(Plotter.Callback):
             def on_quit(self):
@@ -1061,6 +1069,7 @@ def get_camera_frame():
 
     if camera:
         _, state.camera_frame = camera.read()
+        print(state.camera_frame.shape)
         print("[real camera] Captured")
         if state.camera_frame is not None:
             state.camera_frame = cv2.cvtColor(state.camera_frame, cv2.COLOR_RGB2BGR)

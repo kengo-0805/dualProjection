@@ -8,7 +8,7 @@ np.set_printoptions(suppress=True)
 """
 
 
-def homography_cam2pj():
+def cam2pj():
     pj_cord = []
     # # カメラ視点でのバウンディングボックスの座標の読み込み
     # bb_cord = np.loadtxt("bb_cord.txt")
@@ -31,30 +31,62 @@ def homography_cam2pj():
     # R = R[0]
     # t = t[0]
     
+    theta1 = 13
+    theta2 = 4
+    theta3 = 0
+    c1 = np.cos(theta1 * np.pi / 180)
+    s1 = np.sin(theta1 * np.pi / 180)
+    c2 = np.cos(theta2 * np.pi / 180)
+    s2 = np.sin(theta2 * np.pi / 180)
+    c3 = np.cos(theta3 * np.pi / 180)
+    s3 = np.sin(theta3 * np.pi / 180)
     # ステレオキャリブレーションで求めた
     R = np.loadtxt("R_cmpj.txt")
+    R = np.array([[ 0.97469931,  0.03872942,  0.22013926],[ 0.00090655,  0.88339792, -0.18145218],[-0.22351203,  0.17728102,  0.85844343]])
+    R = np.array([[c2*c3, -c2*s3, s2],
+                      [c1*s3+c3*s1*s2, c1*c3-s1*s2*s3, -c2*s1],
+                      [s1*s3-c1*c3*s2, c3*s1+c1*s2*s3, c1*c2]])
+    # R = np.linalg.inv(R)
     t = np.loadtxt("t_cmpj.txt")
-    t = t.reshape([3, 1])
+    t = np.array([[0.20994892],[ -0.1],[ -0.07917737]])
+    t = np.array([[-0.02494892],
+      [ 0.031],
+      [ -0.02917737]])
+    t = -t.reshape([3, 1])
     print(R)
     print(t)
     Rt = np.hstack((R, t))
     addH = np.array([0, 0, 0, 1])
     Rt = np.vstack((Rt, addH))
     print("Rt\n", Rt)
-
-    # BBの3次元座標
+    # BBの3次元座標をPJ視点に変換
     obj_xyz = np.loadtxt("obj_xyz.txt")
+    # obj_xyz = np.array([[-0.1938755363225937, 0.28660544753074646, 1.1370000314712524], [-0.19045208394527435, 0.5568839907646179, 1.1300001192092896], [-0.025923406705260277, 0.5798279643058777, 1.1350000667572021], [-0.04630880802869797, 0.28822726011276245, 1.132000036239624]])
+    print("obj_xyz", obj_xyz)
     for i in range(4):
       # obj_xyz[i] = obj_xyz[i] / obj_xyz[i][2]
-      xyz = np.hstack((np.transpose(obj_xyz[i]), 1))
-
-      print("xyz\n", xyz)
-      additional = np.dot(Rt, xyz)
-      additional = world2cam(additional[:3], modelview_matrix, projection_matrix, (1920, 1080))
-      # print("add\n", additional)
-      pj_cord = np.append(pj_cord, additional)
-    pj_cord = pj_cord.reshape([4, 2])
-    print("pj視点のBB\n", pj_cord)
+      # print("前", obj_xyz[i])
+      cv2gl = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]])
+      xyz = np.dot(cv2gl, np.transpose(obj_xyz[i]))
+      # print("後", xyz)
+      xyz = np.hstack((xyz, 1))
+      xyz = np.transpose(xyz)
+      # print("xyz\n", xyz)
+      pj_xyz = np.dot(Rt, xyz)
+      print("pj_xyz\n", pj_xyz)
+      # additional = np.delete(pj_xyz, 3, 0)
+      # modelview-1で視点移動してからのworld2camでまたmodelview
+      tanni = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+      # additional = np.dot(np.linalg.inv(modelview_matrix), np.transpose(pj_xyz))
+      additional = pj_xyz
+      # additional = np.array([0, 0, -1.6])
+      # print("world object xyz", additional)
+      # print(additional)
+      pj_uv = world2cam(additional[:3], modelview_matrix, projection_matrix, (1920, 1080))
+      # print("add\n", pj_uv)
+      pj_cord = np.append(pj_cord, pj_uv)
+    pj_cord_uv = pj_cord.reshape([4, 2])
+    print("pj視点のBB\n", pj_cord_uv)
 
 
 
@@ -68,7 +100,7 @@ def homography_cam2pj():
     # np.savetxt("pjjjj_cord.txt", pj_cord)
     # print("pj視点のBB\n", pj_cord)
 
-    return pj_cord
+    return pj_cord_uv
 
 
 DEFAULT_DISPLAY_WIDTH  = 1920
@@ -143,12 +175,12 @@ def plot_points_on_wall():
     wTw2p = board_vertices[0]
     wPs = []
     # bb_cordにpj視点に変換した座標を代入
-    bbb_cord = homography_cam2pj()
+    bbb_cord = cam2pj()
     for i in range(4):
 
         # uv, _ = world2cam(p, modelview_matrix, projection_matrix, (display_width, display_height))
-        uv = (bbb_cord[i][0], bbb_cord[i][1])
-        cDc2p, cRw, cTc2w, _ = cam2world(uv, modelview_matrix, projection_matrix, (display_width, display_height))
+        pj1_uv = (bbb_cord[i][0], bbb_cord[i][1])
+        cDc2p, cRw, cTc2w, _ = cam2world(pj1_uv, modelview_matrix, projection_matrix, (display_width, display_height))
         # projectionかけた後にzで割ったもの, 回転行列, 並進ベクトル
 
         wRc = cRw.T
@@ -186,7 +218,7 @@ def shadow2pj(points, modelview1, projection1, modelview2, projection2):
   BOARD_X = 0.         # chessboard の3次元位置X座標 [m]（右手系）
   BOARD_Y = 0.         # chessboard の3次元位置Y座標 [m]（右手系）
   BOARD_Z = -1.6 
-  chess_cord =  ((BOARD_X - BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z),(BOARD_X - BOARD_WIDTH / 2, BOARD_Y, BOARD_Z),                (BOARD_X + BOARD_WIDTH / 2, BOARD_Y, BOARD_Z), (BOARD_X + BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT, BOARD_Z))
+  chess_cord =  ((BOARD_X - BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT / 2, BOARD_Z),(BOARD_X - BOARD_WIDTH / 2, BOARD_Y - BOARD_HEIGHT/ 2, BOARD_Z),                (BOARD_X + BOARD_WIDTH / 2, BOARD_Y - BOARD_HEIGHT /2, BOARD_Z), (BOARD_X + BOARD_WIDTH / 2, BOARD_Y + BOARD_HEIGHT / 2, BOARD_Z))
 # チェスボードの角の座標をuvにそれぞれ変換する
   for i in range(4): 
     # w, h = window.get_size()

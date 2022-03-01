@@ -54,7 +54,7 @@ from plotter import Plotter
 # 定数
 #===============================
 
-TARGET_SCREEN_ID = 1     # プロジェクタのスクリーンID
+TARGET_SCREEN_ID =  1    # プロジェクタのスクリーンID
 CAMERA_ID = 1           # カメラID
 
 DATA_DIRNAME = "data"
@@ -862,8 +862,10 @@ def obtain_control_point():
         state.cp2d_cpoint = [np.empty((0, 2)) for _ in range(len(state.cp3d_opengl))]
 
         pid = 0  # [see] まずは1つの平面のみを実装
-        window.set_fullscreen(fullscreen=False)
-        plotter = Plotter(imgarray=state.camera_frame)
+        camera_frame = cv2.imread("./align/align_img_pj2c.png")
+        camera_frame = cv2.cvtColor(camera_frame, cv2.COLOR_RGB2BGR)
+        # window.set_fullscreen(fullscreen=False)
+        plotter = Plotter(imgarray=camera_frame)
         move_plotter()
 
         class _callback(Plotter.Callback):
@@ -896,7 +898,10 @@ def obtain_homography_matrix():
 
         pid = 0  # [see] まずは1つの平面のみを実装
 
-        plotter = Plotter(imgarray=state.camera_frame)
+        camera_frame = cv2.imread("./align/align_img_pj2h.png")
+        camera_frame = cv2.cvtColor(camera_frame, cv2.COLOR_RGB2BGR)
+
+        plotter = Plotter(imgarray=camera_frame)
         move_plotter()
         class _callback(Plotter.Callback):
             def on_quit(self):
